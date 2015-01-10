@@ -1,8 +1,8 @@
 "use strict";
-var fs = require("fs"),
+var child_process = require("child_process"),
+  fs = require("fs"),
 	path = require("path"),
-	exec = require("child_process").exec,
-  q = require("q");
+	q = require("q");
 
 var gpioAdmin = "gpio-admin",
 	sysFsPath = "/sys/devices/virtual/gpio";
@@ -56,16 +56,22 @@ function isNumber(number) {
 
 function noop() {}
 
-function handleExecResponse(method, pinNumber, callback) {
-	return function(err, stdout, stderr) {
-		if (err) {
-			console.error("Error when trying to", method, "pin", pinNumber);
-			console.error(stderr);
-			callback(err);
-		} else {
-			callback();
-		}
-	}
+function exec(command) {
+  var deferred = q.defer();
+  child_process.exec(command, function (error, stdout, stderr) {
+    if (error) {
+      error.message = stderr;
+      deferred.reject(error);
+    } else {
+      deferred.resolve(stdout);
+    }
+  });
+  return deferred.promise;
+}
+
+function reportError(method, pinNumber, error) {
+  console.error("Error when trying to", method, "pin", pinNumber);
+  console.error(error);
 }
 
 function sanitizePinNumber(pinNumber) {
@@ -129,15 +135,16 @@ var gpio = {
 
 		options = sanitizeOptions(options);
 
-		exec(gpioAdmin + " export " + pinMapping[pinNumber] + " " + options.pull, handleExecResponse("open", pinNumber, function (error) {
-			if (error) {
-        (callback || noop)(error);
-        deferred.reject(new Error(error));
-      } else {
+		exec(gpioAdmin + " export " + pinMapping[pinNumber] + " " + options.pull)
+      .then(function () {
         gpio.setDirection(pinNumber, options.direction, callback);
         deferred.resolve();
-      }
-		}));
+      })
+      .fail(function (error) {
+        reportError("open", pinNumber, error);
+        (callback || noop)(error);
+        deferred.reject(new Error(error));
+      });
 
     return deferred.promise;
 	},
@@ -176,25 +183,34 @@ var gpio = {
 	},
 
 	close: function(pinNumber, callback) {
-    
+    var deferred = q.defer();
 		pinNumber = sanitizePinNumber(pinNumber);
 
-		exec(gpioAdmin + " unexport " + pinMapping[pinNumber], handleExecResponse("close", pinNumber, callback || noop));
+		exec(gpioAdmin + " unexport " + pinMapping[pinNumber])
+      .then(function () {
+        (callback || noop)();
+        deferred.resolve();
+      })
+      .fail(function (error) {
+        reportError("close", pinNumber, error);
+        (callback || noop)();
+        deferred.reject(error);
+      });
+
+    return deferred.promise;
 	},
 
 	read: function(pinNumber, callback) {
     var deferred = q.defer();
 		pinNumber = sanitizePinNumber(pinNumber);
 
-		fs.readFile(sysFsPath + "/gpio" + pinMapping[pinNumber] + "/value", function(err, data) {
-			if (err) {
-        (callback || noop)(err);
-        deferred.reject(err);
-        return;
+		fs.readFile(sysFsPath + "/gpio" + pinMapping[pinNumber] + "/value", function(error, data) {
+			var result = parseInt(data, 10);
+      (callback || noop)(error, result);
+      if (error) {
+        deferred.reject(error);
       } else {
-        var dataInt = parseInt(data, 10);
-        (callback || noop)(null, dataInt);
-        deferred.resolve(dataInt);
+        deferred.resolve(result);
       }
 		});
     return deferred.promise;
