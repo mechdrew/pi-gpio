@@ -2,7 +2,7 @@
 var child_process = require("child_process"),
   gpioUtil = require("pi-gpioutil"),
   revision = require("./piRevision"),
-  physToBcm = require("./pimMap").physToBcm,
+  physToBcm = require("./pinMap").physToBcm,
   physToWiring = require("./pinMap").physToWiring,
   parseOptions = require("./paramParser").parseOptions,
   parseValue = require("./paramParser").parseValue,
