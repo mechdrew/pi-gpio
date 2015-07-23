@@ -18,6 +18,10 @@ var sysFsPath = "/sys/devices/virtual/gpio";
 
 function noop(){};
 
+function isNumber(number) {
+	return !isNaN(parseInt(number, 10));
+}
+
 function sanitizePinNumber(pinNumber) {
 	if (!isNumber(pinNumber) || !isNumber(pinMapping[pinNumber])) {
 		throw new Error("Pin number isn't valid");
