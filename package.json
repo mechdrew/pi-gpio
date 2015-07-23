@@ -18,7 +18,9 @@
     "gpio",
     "simple"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "pi-gpioutil": "^0.0.2"
+  },
   "devDependencies": {
     "mocha": "1.x",
     "should": "1.x"
